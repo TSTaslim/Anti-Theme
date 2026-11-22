@@ -1,0 +1,625 @@
+// ============================================================================
+// WallpaperGlass — Clean, Lightweight & Fast theme.js with Background Customizer
+// ============================================================================
+// Companion runtime script for user.css:
+//   1. Strips dynamic inline & computed opaque purple/dark background fills on
+//      playlist/album/artist top bars, sticky tracklist column headers, and
+//      the bottom Now Playing player bar (and its outer wrappers).
+//   2. Automatically detects any white-background boxes, toast popups, or
+//      floating buttons (like "+ Add CSS" or "Added to Liked Songs") and locks
+//      high-contrast dark ink (`#0b0b10`) onto them so no box ever whites out.
+//   3. Guarantees the bottom-left Now Playing song name & artist stay 100%
+//      visible and unmasked, with full Spicy Lyrics compatibility.
+//   4. Native "Change Background" menu item integrated into Spotify's profile
+//      dropdown menu with image upload, live preview, immediate apply & reset.
+// ============================================================================
+
+(function WallpaperGlassRuntime() {
+  const STORAGE_KEY = "wallpaperGlass:customBg";
+
+  // --------------------------------------------------------------------------
+  // 1. Wallpaper Persistence & Immediate Application
+  // --------------------------------------------------------------------------
+  function applySavedWallpaper() {
+    try {
+      const savedBg = localStorage.getItem(STORAGE_KEY);
+      if (savedBg) {
+        document.documentElement.style.setProperty("--wp-image", `url("${savedBg}")`);
+      } else {
+        document.documentElement.style.removeProperty("--wp-image");
+      }
+    } catch (err) {
+      console.warn("[WallpaperGlass] Failed to read saved wallpaper:", err);
+    }
+  }
+
+  // Apply immediately on script load
+  applySavedWallpaper();
+
+  // --------------------------------------------------------------------------
+  // 2. DOM Background Cleanup & White-Out Fixes
+  // --------------------------------------------------------------------------
+  function clearElementBg(el, clearBackdrop) {
+    if (!el || !el.style) return;
+    el.style.setProperty("background", "transparent", "important");
+    el.style.setProperty("background-color", "transparent", "important");
+    el.style.setProperty("background-image", "none", "important");
+    el.style.setProperty("--background-base", "transparent", "important");
+    el.style.setProperty("--background-elevated-base", "transparent", "important");
+    el.style.setProperty("--spice-main-elevated", "transparent", "important");
+    el.style.setProperty("--spice-player", "transparent", "important");
+    if (clearBackdrop) {
+      el.style.setProperty("backdrop-filter", "none", "important");
+      el.style.setProperty("-webkit-backdrop-filter", "none", "important");
+      el.style.setProperty("box-shadow", "none", "important");
+      el.style.setProperty("border", "none", "important");
+    }
+  }
+
+  function fixWhiteOutBoxesAndSongTitle() {
+    // Ensure bottom-left Now Playing song title & artist are never masked out
+    const nowPlayingWidget = document.querySelector(
+      '[data-testid="now-playing-widget"], .main-nowPlayingWidget-nowPlaying, footer[data-testid="now-playing-bar"], [data-testid="now-playing-bar"]'
+    );
+    if (nowPlayingWidget) {
+      nowPlayingWidget
+        .querySelectorAll(
+          '[data-testid="context-item-info-title"], [data-testid="context-item-info-subtitles"], .main-trackInfo-name, .main-trackInfo-artists, .trk-title, a, span'
+        )
+        .forEach((el) => {
+          el.style.setProperty("-webkit-mask-image", "none", "important");
+          el.style.setProperty("mask-image", "none", "important");
+        });
+    }
+
+    // Ensure full-width snackbar/toast wrappers never show a white bar
+    document
+      .querySelectorAll(
+        '.notistack-SnackbarContainer, [class*="Snackbar"], [class*="snackbar"], [data-encore-id="snackbar"], .notistack-SnackbarContainer [role="status"], .notistack-SnackbarContainer [role="alert"]'
+      )
+      .forEach((el) => {
+        el.style.setProperty("background", "transparent", "important");
+        el.style.setProperty("background-color", "transparent", "important");
+        el.style.setProperty("box-shadow", "none", "important");
+        el.style.setProperty("border", "none", "important");
+        el.querySelectorAll("*:not(button)").forEach((child) => {
+          child.style.setProperty("color", "#f5f5fa", "important");
+        });
+      });
+
+    // Fix white-background buttons so text is dark #0b0b10
+    document
+      .querySelectorAll(
+        '#main-view button.encore-inverted-light-set, .GenericModal button.encore-inverted-light-set, ' +
+        '#main-view button[class*="add-snippet"], .marketplace-add-snippet-btn, ' +
+        '#main-view button[style*="255, 255, 255"], #main-view button[style*="#fff"]'
+      )
+      .forEach((el) => {
+        el.style.setProperty("color", "#0b0b10", "important");
+        el.querySelectorAll("*:not(button)").forEach((child) => {
+          child.style.setProperty("color", "#0b0b10", "important");
+          child.style.setProperty("fill", "#0b0b10", "important");
+        });
+      });
+  }
+
+  function cleanTopBarsAndStickyHeaders() {
+    // Clear all global & playlist topbar containers, backgrounds, and overlays
+    document
+      .querySelectorAll(
+        'header[data-testid="topbar"], [data-testid="global-nav-bar"], .Root__top-bar, ' +
+          "#main-view header, .main-topBar-container, .main-topBar-background, " +
+          ".main-topBar-overlay, .main-topBar-topbarContentWrapper, " +
+          ".main-topBar-topbarContent, .main-entityHeader-topbarContent"
+      )
+      .forEach((el) => clearElementBg(el, true));
+
+    // Clear sticky tracklist column headers ("# Title Album Date added")
+    document
+      .querySelectorAll(
+        ".main-trackList-trackListHeader, .main-trackList-trackListHeaderStuck, " +
+          ".main-trackList-trackListHeaderRow, " +
+          '[data-testid="track-list"] [role="presentation"], ' +
+          '[data-testid="playlist-tracklist"] [role="presentation"], ' +
+          '[data-testid="track-list"] > div[style*="top"], ' +
+          '[data-testid="playlist-tracklist"] > div[style*="top"], ' +
+          '[data-testid="track-list"] > div[style*="sticky"], ' +
+          '[data-testid="playlist-tracklist"] > div[style*="sticky"]'
+      )
+      .forEach((el) => clearElementBg(el, true));
+
+    const mainView = document.getElementById("main-view");
+    if (mainView) {
+      mainView.querySelectorAll('[role="columnheader"]').forEach((colHeader) => {
+        let cur = colHeader;
+        while (
+          cur &&
+          cur !== mainView &&
+          cur.getAttribute("role") !== "grid" &&
+          cur.getAttribute("data-testid") !== "playlist-tracklist" &&
+          cur.getAttribute("data-testid") !== "track-list"
+        ) {
+          clearElementBg(cur, true);
+          cur = cur.parentElement;
+        }
+      });
+    }
+  }
+
+  function cleanNowPlayingBar() {
+    const npBars = document.querySelectorAll(
+      '[data-testid="now-playing-bar"], footer[data-testid="now-playing-bar"], ' +
+        'aside[data-testid="now-playing-bar"], .Root__now-playing-bar, ' +
+        ".main-nowPlayingBar-container, .main-nowPlayingBar-nowPlayingBar, " +
+        ".main-nowPlayingBar-left, .main-nowPlayingBar-center, .main-nowPlayingBar-right"
+    );
+
+    npBars.forEach((bar) => {
+      const isMainDock = bar.getAttribute("data-testid") === "now-playing-bar";
+      clearElementBg(bar, !isMainDock);
+      if (isMainDock) {
+        bar.style.setProperty(
+          "backdrop-filter",
+          "blur(var(--glass-blur, 12px)) saturate(135%)",
+          "important"
+        );
+        bar.style.setProperty(
+          "-webkit-backdrop-filter",
+          "blur(var(--glass-blur, 12px)) saturate(135%)",
+          "important"
+        );
+      }
+
+      let parent = bar.parentElement;
+      while (parent && parent !== document.body && parent !== document.documentElement) {
+        if (
+          parent.id !== "main-view" &&
+          parent.id !== "Desktop_LeftSidebar_Id" &&
+          !parent.classList.contains("Root__right-sidebar")
+        ) {
+          const isDockAncestor = parent.getAttribute("data-testid") === "now-playing-bar";
+          clearElementBg(parent, !isDockAncestor);
+        }
+        parent = parent.parentElement;
+      }
+
+      bar.querySelectorAll(":scope > div, :scope > aside, :scope > footer").forEach((child) => {
+        if (
+          child.tagName !== "BUTTON" &&
+          child.getAttribute("role") !== "button" &&
+          child.getAttribute("role") !== "progressbar"
+        ) {
+          clearElementBg(child, true);
+        }
+      });
+    });
+  }
+
+  function cleanDynamicBackgrounds() {
+    fixWhiteOutBoxesAndSongTitle();
+    cleanTopBarsAndStickyHeaders();
+    cleanNowPlayingBar();
+
+    const mainView = document.getElementById("main-view");
+    if (!mainView || mainView.querySelector("#SpicyLyricsPage")) return;
+
+    const inlineBgNodes = mainView.querySelectorAll(
+      '[style*="background"], ' +
+        '[data-testid="playlist-page"] [style*="background"], ' +
+        '[data-testid="album-page"] [style*="background"], ' +
+        '[data-testid="artist-page"] [style*="background"], ' +
+        '.marketplace-header[style*="background"]'
+    );
+
+    for (const el of inlineBgNodes) {
+      if (
+        el.tagName === "BUTTON" ||
+        el.getAttribute("role") === "button" ||
+        el.getAttribute("role") === "progressbar" ||
+        el.hasAttribute("data-encore-id") ||
+        el.classList.contains("main-playButton-PlayButton") ||
+        el.classList.contains("main-playButton-button") ||
+        el.closest('[data-testid="progress-bar"], [role="progressbar"], button')
+      ) {
+        continue;
+      }
+      const bgImg = el.style.backgroundImage || "";
+      if (!bgImg.includes("url(")) {
+        el.style.setProperty("background", "transparent", "important");
+        el.style.setProperty("background-color", "transparent", "important");
+        el.style.setProperty("background-image", "none", "important");
+      }
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 3. Image Optimization (Canvas WebP/JPEG Resize for Safe Storage)
+  // --------------------------------------------------------------------------
+  function processImageFile(file, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const rawData = e.target.result;
+      const img = new Image();
+      img.onload = () => {
+        const MAX_WIDTH = 2560;
+        const MAX_HEIGHT = 1440;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+          const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        let optimized = canvas.toDataURL("image/webp", 0.86);
+        if (!optimized.startsWith("data:image/webp")) {
+          optimized = canvas.toDataURL("image/jpeg", 0.86);
+        }
+        callback(optimized);
+      };
+      img.onerror = () => callback(rawData);
+      img.src = rawData;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // --------------------------------------------------------------------------
+  // 4. Background Customization Modal Dialog
+  // --------------------------------------------------------------------------
+  function openBackgroundModal() {
+    const currentCustomBg = localStorage.getItem(STORAGE_KEY) || "";
+    let stagingBg = currentCustomBg;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "wg-modal-dialog";
+
+    modalContainer.innerHTML = `
+      <div class="wg-modal-desc">
+        Select a custom wallpaper image for your WallpaperGlass theme. The selected background is saved locally and applied immediately.
+      </div>
+
+      <div class="wg-dropzone" id="wg-dropzone">
+        <div style="font-size: 2rem;">🖼️</div>
+        <div style="font-weight: 600; font-size: 0.95rem;">Drag & drop image here or click to browse</div>
+        <div style="font-size: 0.8rem; color: var(--wp-subtext);">Supports PNG, JPG, WebP, GIF (auto-optimized for performance)</div>
+        <input type="file" id="wg-file-input" accept="image/*" style="display: none;">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label style="font-size: 0.8rem; font-weight: 600; color: var(--wp-subtext);">Or enter Image URL:</label>
+        <input type="text" id="wg-url-input" class="wg-url-input" placeholder="https://example.com/wallpaper.jpg" value="${currentCustomBg.startsWith('http') ? currentCustomBg : ''}">
+      </div>
+
+      <div>
+        <label style="font-size: 0.8rem; font-weight: 600; color: var(--wp-subtext); margin-bottom: 6px; display: block;">Live Preview (with Theme Glass Overlay):</label>
+        <div class="wg-preview-wrapper" id="wg-preview" style="background-image: ${stagingBg ? `url("${stagingBg}")` : 'var(--wp-image)'};">
+          <div class="wg-preview-glass-card">
+            <span style="font-size: 1.2rem;">🎵</span>
+            <div>
+              <div style="font-weight: 700; font-size: 0.9rem;">Soft and Cold</div>
+              <div style="font-size: 0.75rem; color: var(--wp-subtext);">Translucent Glass Preview</div>
+            </div>
+            <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--wp-accent); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: #0b0b10;">▶</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wg-modal-actions">
+        <button id="wg-reset-btn" class="Button-sc-1dqy6lx-0" data-encore-id="buttonSecondary" style="color: #ff6ea0; border-color: rgba(232, 74, 127, 0.4);">
+          Reset to Default
+        </button>
+        <div style="display: flex; gap: 8px;">
+          <button id="wg-cancel-btn" data-encore-id="buttonTertiary" style="padding: 8px 16px; cursor: pointer;">
+            Cancel
+          </button>
+          <button id="wg-apply-btn" data-encore-id="buttonPrimary" style="padding: 8px 24px; font-weight: 700; cursor: pointer;">
+            Apply
+          </button>
+        </div>
+      </div>
+    `;
+
+    const dropzone = modalContainer.querySelector("#wg-dropzone");
+    const fileInput = modalContainer.querySelector("#wg-file-input");
+    const urlInput = modalContainer.querySelector("#wg-url-input");
+    const preview = modalContainer.querySelector("#wg-preview");
+    const applyBtn = modalContainer.querySelector("#wg-apply-btn");
+    const resetBtn = modalContainer.querySelector("#wg-reset-btn");
+    const cancelBtn = modalContainer.querySelector("#wg-cancel-btn");
+
+    function updatePreview(bgUrl) {
+      stagingBg = bgUrl;
+      preview.style.backgroundImage = bgUrl ? `url("${bgUrl}")` : "var(--wp-image)";
+    }
+
+    // Dropzone events
+    dropzone.addEventListener("click", () => fileInput.click());
+    dropzone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropzone.classList.add("dragover");
+    });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dragover");
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        processImageFile(e.dataTransfer.files[0], (dataUrl) => {
+          updatePreview(dataUrl);
+          urlInput.value = "";
+        });
+      }
+    });
+
+    fileInput.addEventListener("change", (e) => {
+      if (e.target.files && e.target.files[0]) {
+        processImageFile(e.target.files[0], (dataUrl) => {
+          updatePreview(dataUrl);
+          urlInput.value = "";
+        });
+      }
+    });
+
+    urlInput.addEventListener("input", (e) => {
+      const val = e.target.value.trim();
+      updatePreview(val);
+    });
+
+    // Reset button
+    resetBtn.addEventListener("click", () => {
+      stagingBg = "";
+      urlInput.value = "";
+      updatePreview("");
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        document.documentElement.style.removeProperty("--wp-image");
+        if (window.Spicetify && Spicetify.showNotification) {
+          Spicetify.showNotification("Default wallpaper restored");
+        }
+      } catch (_) {}
+      closeModal();
+    });
+
+    // Apply button
+    applyBtn.addEventListener("click", () => {
+      if (stagingBg) {
+        try {
+          localStorage.setItem(STORAGE_KEY, stagingBg);
+          document.documentElement.style.setProperty("--wp-image", `url("${stagingBg}")`);
+          if (window.Spicetify && Spicetify.showNotification) {
+            Spicetify.showNotification("Wallpaper applied successfully!");
+          }
+        } catch (err) {
+          console.error("[WallpaperGlass] Storage quota error:", err);
+          alert("Image is too large to save in local storage. Please select a smaller image or use a direct URL.");
+          return;
+        }
+      }
+      closeModal();
+    });
+
+    function closeModal() {
+      if (window.Spicetify && Spicetify.PopupModal && typeof Spicetify.PopupModal.hide === "function") {
+        Spicetify.PopupModal.hide();
+      }
+      const customOverlay = document.getElementById("wg-custom-modal-overlay");
+      if (customOverlay) customOverlay.remove();
+    }
+
+    cancelBtn.addEventListener("click", closeModal);
+
+    // Display modal
+    if (window.Spicetify && Spicetify.PopupModal && typeof Spicetify.PopupModal.display === "function") {
+      Spicetify.PopupModal.display({
+        title: "Change Background",
+        content: modalContainer,
+        isLarge: true,
+      });
+    } else {
+      // Standalone glass modal fallback
+      const overlay = document.createElement("div");
+      overlay.id = "wg-custom-modal-overlay";
+      overlay.style.cssText = `
+        position: fixed; inset: 0; z-index: 99999;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(8px);
+        display: flex; align-items: center; justify-content: center;
+      `;
+      const dialog = document.createElement("div");
+      dialog.className = "GenericModal spicetify-popup";
+      dialog.style.cssText = `
+        width: 600px; max-width: 90vw; max-height: 85vh;
+        overflow-y: auto; padding: 24px; border-radius: 12px;
+      `;
+      const header = document.createElement("div");
+      header.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;";
+      header.innerHTML = `
+        <h2 style="font-size: 1.3rem; font-weight: 700; margin: 0; color: #fff;">Change Background</h2>
+        <button style="background: none; border: none; color: #fff; font-size: 1.4rem; cursor: pointer;">✕</button>
+      `;
+      header.querySelector("button").onclick = () => overlay.remove();
+      dialog.appendChild(header);
+      dialog.appendChild(modalContainer);
+      overlay.appendChild(dialog);
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) overlay.remove();
+      });
+      document.body.appendChild(overlay);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 5. Register "Change Background" in Spotify Profile Icon Dropdown Menu
+  // --------------------------------------------------------------------------
+  function registerProfileMenuItem() {
+    let registered = false;
+
+    // A. Native Spicetify Menu API Registration
+    function trySpicetifyMenu() {
+      if (registered) return;
+      if (window.Spicetify && Spicetify.Menu && Spicetify.Menu.Item) {
+        try {
+          const menuItem = new Spicetify.Menu.Item(
+            "Change Background",
+            false,
+            () => openBackgroundModal(),
+            "edit"
+          );
+
+          // Enhance shouldAdd to match all Spotify profile button variations
+          const origShouldAdd = menuItem.shouldAdd;
+          menuItem.shouldAdd = (props, trigger, target) => {
+            if (origShouldAdd && origShouldAdd(props, trigger, target)) return true;
+            if (trigger === "click") {
+              return !!target?.closest?.(
+                '[data-testid="user-widget-link"], [data-testid*="user-widget"], [data-testid="username-button"], .main-userWidget-box, .main-userWidget-boxCondensed, button[aria-label*="profile" i]'
+              );
+            }
+            return false;
+          };
+
+          menuItem.register();
+          registered = true;
+          console.log("[WallpaperGlass] Registered 'Change Background' in Spicetify.Menu");
+        } catch (err) {
+          console.warn("[WallpaperGlass] Spicetify.Menu registration notice:", err);
+        }
+      }
+    }
+
+    trySpicetifyMenu();
+
+    // B. DOM Fallback Observer for Profile Dropdown Context Menu
+    // Ensures the menu item is reliably displayed across all Spotify client builds
+    const menuObserver = new MutationObserver(() => {
+      const menu = document.querySelector('[role="menu"], .main-contextMenu-menu');
+      if (!menu) return;
+
+      // Check if this menu is Spotify's Profile dropdown
+      const isProfileMenu =
+        menu.querySelector('a[href*="spotify.com/account"]') ||
+        menu.querySelector('a[href*="account.spotify.com"]') ||
+        menu.querySelector('[data-testid="user-widget-menu"]') ||
+        Array.from(menu.querySelectorAll("button, a, span")).some((el) => {
+          const txt = (el.textContent || "").trim().toLowerCase();
+          return txt === "account" || txt === "profile" || txt === "log out";
+        });
+
+      if (isProfileMenu && !menu.querySelector("#wg-profile-bg-item")) {
+        const itemContainer = document.createElement("li");
+        itemContainer.id = "wg-profile-bg-item";
+        itemContainer.setAttribute("role", "presentation");
+
+        const btn = document.createElement("button");
+        btn.className = "main-contextMenu-menuItemButton";
+        btn.setAttribute("role", "menuitem");
+        btn.style.cssText = `
+          width: 100%; display: flex; align-items: center; gap: 10px;
+          padding: 10px 14px; background: transparent; border: none;
+          color: var(--wp-text, #f5f5fa); cursor: pointer; font-size: 0.88rem;
+          text-align: left; border-radius: 4px; transition: background-color 120ms ease;
+        `;
+        btn.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M11.854.146a.5.5 0 0 0-.707 0L10.5 7.793l4.707 4.707a.5.5 0 0 0 .708-.708L12.558.146a.5.5 0 0 0-.704 0zM1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5h6a.5.5 0 0 0 0-1h-6A1.5 1.5 0 0 0 1 2.5v11z"/>
+          </svg>
+          <span style="flex: 1; font-weight: 500;">Change Background</span>
+        `;
+
+        btn.addEventListener("mouseenter", () => {
+          btn.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+        });
+        btn.addEventListener("mouseleave", () => {
+          btn.style.backgroundColor = "transparent";
+        });
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          // Close the context menu
+          document.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          openBackgroundModal();
+        });
+
+        // Prepend as the first option in the profile menu
+        if (menu.firstChild) {
+          menu.insertBefore(itemContainer, menu.firstChild);
+        } else {
+          menu.appendChild(itemContainer);
+        }
+        itemContainer.appendChild(btn);
+      }
+    });
+
+    menuObserver.observe(document.body, { childList: true, subtree: true });
+
+    // Expose openBackgroundModal on window for extensions or debugging
+    window.WallpaperGlass = window.WallpaperGlass || {};
+    window.WallpaperGlass.openBackgroundModal = openBackgroundModal;
+    window.WallpaperGlass.resetWallpaper = () => {
+      localStorage.removeItem(STORAGE_KEY);
+      applySavedWallpaper();
+    };
+  }
+
+  // --------------------------------------------------------------------------
+  // 6. Theme Lifecycle Startup
+  // --------------------------------------------------------------------------
+  function start() {
+    cleanDynamicBackgrounds();
+    registerProfileMenuItem();
+
+    const attachHistoryListener = () => {
+      if (window.Spicetify && Spicetify.Platform && Spicetify.Platform.History) {
+        Spicetify.Platform.History.listen(() => {
+          setTimeout(cleanDynamicBackgrounds, 60);
+          setTimeout(cleanDynamicBackgrounds, 300);
+        });
+      } else {
+        setTimeout(attachHistoryListener, 800);
+      }
+    };
+    attachHistoryListener();
+
+    let scrollTicking = false;
+    document.addEventListener(
+      "scroll",
+      () => {
+        if (!scrollTicking) {
+          scrollTicking = true;
+          requestAnimationFrame(() => {
+            cleanTopBarsAndStickyHeaders();
+            scrollTicking = false;
+          });
+        }
+      },
+      { capture: true, passive: true }
+    );
+
+    let timer = null;
+    const observer = new MutationObserver(() => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        requestAnimationFrame(cleanDynamicBackgrounds);
+      }, 160);
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style", "class"],
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start, { once: true });
+  } else {
+    start();
+  }
+})();
