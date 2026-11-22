@@ -1,0 +1,1 @@
+Regular spicetify theme where you can change the background.<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/76921a54-47ca-4f0a-b5cb-cf79ca1301f7" />
