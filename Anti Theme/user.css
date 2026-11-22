@@ -961,6 +961,25 @@ input[data-testid="search-input"]::placeholder,
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
 }
 
+.main-contextMenu-menu,
+#context-menu,
+.main-contextMenu-tippy,
+[data-tippy-root] .tippy-box,
+[data-tippy-root] .tippy-content,
+[data-tippy-root] [role="menu"] {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+.main-contextMenu-menu::-webkit-scrollbar,
+#context-menu::-webkit-scrollbar,
+[data-tippy-root] [role="menu"]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 .os-scrollbar-handle,
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.18) !important;
